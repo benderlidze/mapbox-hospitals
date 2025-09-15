@@ -7,12 +7,14 @@
     <title>Hospital Map</title>
     <script src='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js'></script>
     <link href='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css' rel='stylesheet' />
+    <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@300;400;600;700;800&display=swap"
+        rel="stylesheet">
     <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
     <style>
         body {
             margin: 0;
             padding: 0;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif;
         }
 
         #map {
@@ -25,38 +27,147 @@
         .mapboxgl-popup-content {
             border-radius: 12px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
-            border: 1px solid rgba(255, 255, 255, 0.2);
-            backdrop-filter: blur(20px);
-            background: rgba(255, 255, 255, 0.95);
-            padding: 20px;
-            max-width: 320px;
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            background: #ffffff;
+            padding: 30px;
+            color: #23303a;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
         }
 
+        .mapboxgl-popup-close-button {
+            color: #0b7285;
+            opacity: 0.9;
+            font-size: 25px;
+            width: 36px;
+            height: 36px;
+            line-height: 36px;
+            border-radius: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
+        }
 
         .popup-header {
-            color: #2d3748;
-            font-size: 18px;
-            font-weight: 600;
-            margin-bottom: 12px;
-            border-bottom: 2px solid #e2e8f0;
-            padding-bottom: 8px;
+            color: #0089a8;
+            font-size: 26px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            line-height: 1.1;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
         }
 
         .popup-address {
-            color: #4a5568;
-            font-size: 14px;
-            margin-bottom: 12px;
-            line-height: 1.5;
+            color: #6b7b81;
+            font-size: 16px;
+            margin: 0 0 12px 0;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
+            line-height: 1.4;
         }
 
-        .popup-metric {
-            background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-            color: white;
-            padding: 8px 16px;
-            border-radius: 20px;
+        .popup-divider {
+            height: 1px;
+            background: #e6eef2;
+            margin: 12px 0;
+            border-radius: 1px;
+        }
+
+        /* New 2x2 Grid Styles */
+        .popup-grid {
+            display: grid;
+            grid-template-columns: 1fr 1fr;
+            grid-template-rows: 1fr 1fr;
+            gap: 0;
+            margin-bottom: 14px;
+        }
+
+        .grid-stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            text-align: center;
+            padding: 5px;
+            white-space: nowrap;
+        }
+
+        .grid-stat .value {
+            color: #f59e50;
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 6px;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
+        }
+
+        .grid-stat .label {
+            color: #0089a8;
+            font-size: 19px;
+            font-weight: 600;
+            white-space: nowrap;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
+        }
+
+        /* Keep original flex stats styles for backward compatibility */
+        .popup-stats {
+            display: flex;
+            gap: 18px;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
+        }
+
+        .stat .value {
+            color: #f59e50;
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .stat .label {
+            color: #0089a8;
+            font-size: 19px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .popup-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 6px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: transparent;
+            border: none;
+            color: #0b7285;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 6px 0;
+        }
+
+        .action-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff4ec;
+            color: #f59e50;
+            border: 1px solid rgba(245, 158, 80, 0.12);
             font-size: 14px;
-            font-weight: 500;
-            display: inline-block;
         }
 
         .loading {
@@ -117,12 +228,56 @@
             };
         }
 
-        // Function to create popup content
+        // Function to create popup content with 2x2 grid
         function createPopupContent(properties) {
+            const goKarts = properties.goKarts || '—';
+            const kids = properties.kidsSupported || properties.kids || '—';
             return `
-                <div class="popup-header">${properties.name}</div>
-                <div class="popup-address">${properties.address}</div>
-                <div class="popup-metric">${properties.goKarts} Go Karts</div>
+                <div style="border:0px solid red">
+                    <div class="popup-header">${properties.name}</div>
+                    <div class="popup-address">${properties.address || ''}</div>
+
+                    <div class="popup-divider"></div>
+
+                    <div class="popup-grid">
+                        <div class="grid-stat">
+                            <div class="value">${goKarts}</div>
+                            <div class="label">GO Karts</div>
+                        </div>
+                        <div class="grid-stat">
+                            <div class="value">${kids}</div>
+                            <div class="label">Kids Supported</div>
+                        </div>
+                        <div class="grid-stat">
+                            <div class="value">
+                              <svg display="block" role="presentation" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="26" height="26">
+                                <path d="M 5 10 L 8.5 13.5 L 15 7 M 20 10 C 20 15.523 15.523 20 10 20 C 4.477 20 0 15.523 0 10 C 0 4.477 4.477 0 10 0 C 15.523 0 20 4.477 20 10 Z" 
+                                        fill="none" 
+                                        stroke="#f9af7c" 
+                                        stroke-width="2" 
+                                        stroke-linecap="round" 
+                                        stroke-linejoin="round" 
+                                        transform="translate(2 2)"/>
+                                </svg>
+                            </div>
+                            <div class="label">Player 2 Active</div>
+                        </div>
+                        <div class="grid-stat">
+                            <div class="value">
+                                <svg display="block" role="presentation" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="26" height="26">
+                                    <path d="M 14 6 L 10 10 M 10 10 L 6 14 M 10 10 L 6 6 M 10 10 L 14 14 M 20 10 C 20 15.523 15.523 20 10 20 C 4.477 20 0 15.523 0 10 C 0 4.477 4.477 0 10 0 C 15.523 0 20 4.477 20 10 Z" 
+                                            fill="none" 
+                                            stroke="#f9af7c" 
+                                            stroke-width="2" 
+                                            stroke-linecap="round" 
+                                            stroke-linejoin="round" 
+                                            transform="translate(2 2)"/>
+                                </svg>
+                            </div>
+                            <div class="label">Save Point</div>
+                        </div>
+                    </div>
+                </div>
             `;
         }
 
@@ -151,10 +306,10 @@
                             'interpolate',
                             ['linear'],
                             ['zoom'],
-                            5, 4,
+                            7, 6,
                             15, 12
                         ],
-                        'circle-color': '#667eea',
+                        'circle-color': '#0089a8',
                         'circle-stroke-width': 2,
                         'circle-stroke-color': '#ffffff',
                         'circle-opacity': 0.8
@@ -204,7 +359,8 @@
                     currentPopup = new mapboxgl.Popup({
                         offset: 10,
                         closeButton: true,
-                        closeOnClick: false
+                        closeOnClick: false,
+                        maxWidth: '330px'
                     })
                         .setLngLat(coordinates)
                         .setHTML(createPopupContent(properties))
@@ -249,8 +405,100 @@
             }
         }
 
-        // Load data when map is loaded
+        // Apply custom map styling (water white, land #d2e3e8)
+        function applyCustomStyle() {
+            const waterColor = '#ffffff';
+            const landColor = '#d2e3e8';
+
+            if (!map || !map.isStyleLoaded()) return;
+
+            const layers = map.getStyle().layers || [];
+
+            layers.forEach(layer => {
+                const id = (layer.id || '').toLowerCase();
+                try {
+                    // Water-related layers
+                    if (id.includes('water') || id.includes('ocean') || id.includes('sea') || id.includes('river') || id.includes('waterway')) {
+                        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', waterColor);
+                        else if (layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', waterColor);
+                        else if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', waterColor);
+                    }
+
+                    // Background or land-like layers
+                    else if (layer.type === 'background' || id.includes('land') || id.includes('landuse') || id.includes('park') || id.includes('grass')) {
+                        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', landColor);
+                        else if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', landColor);
+                    }
+
+                    // Hide county-level boundaries (admin-2)
+                    if (id.includes('admin-2') || (id.includes('admin') && id.includes('2'))) {
+                        try { map.setLayoutProperty(layer.id, 'visibility', 'none'); } catch (e) { }
+                        if (layer.type === 'line') {
+                            try { map.setPaintProperty(layer.id, 'line-opacity', 0); } catch (e) { }
+                        }
+                        if (layer.type === 'fill') {
+                            try { map.setPaintProperty(layer.id, 'fill-opacity', 0); } catch (e) { }
+                        }
+                    }
+
+                    // Hide region/state-level boundaries (admin-1)
+                    if (id.includes('admin-1') || (id.includes('admin') && id.includes('1')) || id.includes('region') || id.includes('state') || id.includes('province')) {
+                        try { map.setLayoutProperty(layer.id, 'visibility', 'none'); } catch (e) { }
+                        if (layer.type === 'line') {
+                            try { map.setPaintProperty(layer.id, 'line-opacity', 0); } catch (e) { }
+                            try { map.setPaintProperty(layer.id, 'line-width', 0); } catch (e) { }
+                        }
+                        if (layer.type === 'fill') {
+                            try { map.setPaintProperty(layer.id, 'fill-opacity', 0); } catch (e) { }
+                        }
+                    }
+
+                    // Make country borders (admin-0) white
+                    if (id.includes('admin-0') || (id.includes('admin') && id.includes('0')) || id.includes('country') || id.includes('admin-0-boundary') || id.includes('admin-0-boundaries')) {
+                        if (layer.type === 'line') {
+                            try { map.setPaintProperty(layer.id, 'line-color', '#ffffff'); } catch (e) { }
+                            try { map.setPaintProperty(layer.id, 'line-opacity', 1); } catch (e) { }
+                            try {
+                                // Use a small constant width or a zoom-based interpolate for subtle borders
+                                map.setPaintProperty(layer.id, 'line-width', [
+                                    'interpolate', ['linear'], ['zoom'],
+                                    0, 0.4,
+                                    5, 0.6,
+                                    10, 1
+                                ]);
+                            } catch (e) { }
+                        }
+                        if (layer.type === 'fill') {
+                            try { map.setPaintProperty(layer.id, 'fill-color', '#ffffff'); } catch (e) { }
+                            try { map.setPaintProperty(layer.id, 'fill-opacity', 0.0); } catch (e) { }
+                        }
+                    }
+                    // Hide country name labels (symbols)
+                    if ((id.includes('country') && (id.includes('label') || id.includes('name') || id.includes('place'))) || id.includes('place_country') || id.includes('country-label')) {
+                        try { map.setLayoutProperty(layer.id, 'visibility', 'none'); } catch (e) { }
+                        if (layer.type === 'symbol') {
+                            try { map.setPaintProperty(layer.id, 'text-opacity', 0); } catch (e) { }
+                            try { map.setPaintProperty(layer.id, 'icon-opacity', 0); } catch (e) { }
+                        }
+                    }
+
+                    // Hide all text/symbol labels on the map
+                    if (layer.type === 'symbol') {
+                        try { map.setLayoutProperty(layer.id, 'visibility', 'none'); } catch (e) { }
+                        try { map.setPaintProperty(layer.id, 'text-opacity', 0); } catch (e) { }
+                        try { map.setPaintProperty(layer.id, 'icon-opacity', 0); } catch (e) { }
+                        try { map.setPaintProperty(layer.id, 'text-halo-opacity', 0); } catch (e) { }
+                        try { map.setPaintProperty(layer.id, 'text-color', 'rgba(0,0,0,0)'); } catch (e) { }
+                    }
+                } catch (e) {
+                    // Ignore failures for layers we can't change
+                }
+            });
+        }
+
+        // Load data when map is loaded and apply custom style
         map.on('load', () => {
+            applyCustomStyle();
             loadHospitalData();
         });
 

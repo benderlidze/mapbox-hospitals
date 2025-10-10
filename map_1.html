@@ -1,0 +1,495 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Hospital Map</title>
+    <script src='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.js'></script>
+    <link href='https://api.mapbox.com/mapbox-gl-js/v3.0.1/mapbox-gl.css' rel='stylesheet' />
+    <link href="https://fonts.googleapis.com/css2?family=Albert+Sans:wght@300;400;600;700;800&display=swap"
+        rel="stylesheet">
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/d3/7.8.5/d3.min.js"></script>
+    <style>
+        body {
+            margin: 0;
+            padding: 0;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif;
+        }
+
+        #map {
+            position: absolute;
+            top: 0;
+            bottom: 0;
+            width: 100%;
+        }
+
+        .mapboxgl-popup-content {
+            border-radius: 12px;
+            box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
+            border: 1px solid rgba(0, 0, 0, 0.06);
+            background: #ffffff;
+            padding: 30px;
+            color: #23303a;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
+        }
+
+        .mapboxgl-popup-close-button {
+            color: #0b7285;
+            opacity: 0.9;
+            font-size: 25px;
+            width: 36px;
+            height: 36px;
+            line-height: 36px;
+            border-radius: 18px;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
+        }
+
+        .popup-header {
+            color: #0089a8;
+            font-size: 26px;
+            font-weight: 700;
+            margin: 0 0 8px 0;
+            line-height: 1.1;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
+        }
+
+        .popup-address {
+            color: #6b7b81;
+            font-size: 16px;
+            margin: 0 0 12px 0;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
+            line-height: 1.4;
+        }
+
+        .popup-divider {
+            height: 1px;
+            background: #e6eef2;
+            margin: 12px 0;
+            border-radius: 1px;
+        }
+
+        .popup-flex {
+            display: flex;
+            flex-direction: column;
+            gap: 12px;
+        }
+
+        .popup-flex-item {
+            display: flex;
+            flex-direction: row;
+            justify-content: space-between;
+            align-items: center;
+
+            color: #0089a8;
+            font-size: 18px;
+            font-weight: 700;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
+        }
+
+
+        /* Keep original flex stats styles for backward compatibility */
+        .popup-stats {
+            display: flex;
+            gap: 18px;
+            justify-content: space-between;
+            margin-bottom: 14px;
+        }
+
+        .stat {
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
+        }
+
+        .stat .value {
+            color: #f59e50;
+            font-size: 26px;
+            font-weight: 700;
+            margin-bottom: 6px;
+        }
+
+        .stat .label {
+            color: #0089a8;
+            font-size: 19px;
+            font-weight: 600;
+            white-space: nowrap;
+        }
+
+        .popup-actions {
+            display: flex;
+            gap: 12px;
+            margin-top: 6px;
+            align-items: center;
+            justify-content: space-between;
+        }
+
+        .action-btn {
+            display: inline-flex;
+            align-items: center;
+            gap: 8px;
+            background: transparent;
+            border: none;
+            color: #0b7285;
+            font-weight: 600;
+            cursor: pointer;
+            font-size: 13px;
+            padding: 6px 0;
+        }
+
+        .action-icon {
+            width: 28px;
+            height: 28px;
+            border-radius: 50%;
+            display: inline-flex;
+            align-items: center;
+            justify-content: center;
+            background: #fff4ec;
+            color: #f59e50;
+            border: 1px solid rgba(245, 158, 80, 0.12);
+            font-size: 14px;
+        }
+
+        .loading {
+            position: absolute;
+            top: 50%;
+            left: 50%;
+            transform: translate(-50%, -50%);
+            background: white;
+            padding: 20px;
+            border-radius: 8px;
+            box-shadow: 0 4px 12px rgba(0, 0, 0, 0.1);
+            z-index: 1000;
+        }
+    </style>
+</head>
+
+<body>
+    <div id="loading" class="loading">Loading hospital data...</div>
+    <div id="map"></div>
+
+    <script>
+        // Mapbox access token
+        mapboxgl.accessToken = 'pk.eyJ1Ijoic2VyaHV6IiwiYSI6ImNseXpvc3RlczJpbnIya3FscDU2aHc5d3EifQ.FHtPjde_lqensSHZxqthgw';
+
+        // Variable to store current popup
+        let currentPopup = null;
+
+        // Initialize map with light style
+        const map = new mapboxgl.Map({
+            container: 'map',
+            style: 'mapbox://styles/mapbox/light-v11',
+            center: [-95.7129, 37.0902], // Center of USA
+            zoom: 4,
+            projection: 'mercator'
+        });
+
+        // Function to convert data to GeoJSON
+        function createGeoJSON(hospitals) {
+            console.log('hospitals', hospitals);
+            const features = hospitals
+                .filter(hospital => hospital.lat && hospital.lon && !isNaN(hospital.lat) && !isNaN(hospital.lon)) // Only include rows with coordinates
+                .map(hospital => ({
+                    type: 'Feature',
+                    properties: {
+                        name: hospital.Hospitals,
+                        address: hospital.Address,
+                        goKarts: hospital['Go Karts'],
+                        kidsSupported: hospital['Kids Supported'],
+                    },
+                    geometry: {
+                        type: 'Point',
+                        coordinates: [parseFloat(hospital.lon), parseFloat(hospital.lat)]
+                    }
+                }));
+
+            return {
+                type: 'FeatureCollection',
+                features: features
+            };
+        }
+
+        // Function to create popup content with 2x2 grid and vertical padding
+        function createPopupContent(properties) {
+            console.log('properties', properties);
+            const goKarts = properties.goKarts || '—';
+            const kids = properties.kidsSupported || '—';
+            return `
+                <div style="border:0px solid red">
+                    <div class="popup-header">${properties.name}</div>
+                    <div class="popup-address">${properties.address || ''}</div>
+
+                    <div class="popup-divider"></div>
+
+                    <div class="popup-flex">
+                        <div class="popup-flex-item">
+                            <div class="label">GO Karts</div>
+                            <div class="value" style="min-width:26px;text-align:center">${goKarts}</div>
+                        </div>
+                        <div class="popup-flex-item">
+                            <div class="label">Player 2 Active</div>
+                            <div class="value">
+                              <svg display="block" role="presentation" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="26" height="26">
+                                <path d="M 5 10 L 8.5 13.5 L 15 7 M 20 10 C 20 15.523 15.523 20 10 20 C 4.477 20 0 15.523 0 10 C 0 4.477 4.477 0 10 0 C 15.523 0 20 4.477 20 10 Z" 
+                                        fill="none" 
+                                        stroke="#f9af7c" 
+                                        stroke-width="2" 
+                                        stroke-linecap="round" 
+                                        stroke-linejoin="round" 
+                                        transform="translate(2 2)"/>
+                                </svg>
+                            </div>
+                        </div>
+                        <div class="popup-flex-item">
+                            <div class="label">Save Point</div>
+                            <div class="value">
+                                <svg display="block" role="presentation" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="26" height="26">
+                                    <path d="M 14 6 L 10 10 M 10 10 L 6 14 M 10 10 L 6 6 M 10 10 L 14 14 M 20 10 C 20 15.523 15.523 20 10 20 C 4.477 20 0 15.523 0 10 C 0 4.477 4.477 0 10 0 C 15.523 0 20 4.477 20 10 Z" 
+                                            fill="none" 
+                                            stroke="#f9af7c" 
+                                            stroke-width="2" 
+                                            stroke-linecap="round" 
+                                            stroke-linejoin="round" 
+                                            transform="translate(2 2)"/>
+                                </svg>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            `;
+        }
+
+        // Load and process data
+        async function loadHospitalData() {
+            try {
+                const response = await d3.csv('https://docs.google.com/spreadsheets/d/e/2PACX-1vSbbDiTyKXXPNjafcwE3MjLhpQv5PNfrGqfI5YxS7vccladdwEwZieKF_76soEACnGWgIyPp0BiPBRL/pub?output=csv');
+                console.log('response', response);
+
+                // Convert to GeoJSON
+                const geojsonData = createGeoJSON(response);
+
+                // Add source to map
+                map.addSource('hospitals', {
+                    type: 'geojson',
+                    data: geojsonData
+                });
+
+                // Add circle layer for points
+                map.addLayer({
+                    id: 'hospital-points',
+                    type: 'circle',
+                    source: 'hospitals',
+                    paint: {
+                        'circle-radius': [
+                            'interpolate',
+                            ['linear'],
+                            ['zoom'],
+                            7, 6,
+                            15, 12
+                        ],
+                        'circle-color': '#0089a8',
+                        'circle-stroke-width': 2,
+                        'circle-stroke-color': '#ffffff',
+                        'circle-opacity': 0.8
+                    }
+                });
+
+                // Add hover effect
+                map.addLayer({
+                    id: 'hospital-points-hover',
+                    type: 'circle',
+                    source: 'hospitals',
+                    paint: {
+                        'circle-radius': [
+                            'interpolate',
+                            ['linear'],
+                            ['zoom'],
+                            5, 6,
+                            15, 16
+                        ],
+                        'circle-color': '#f9af7c',
+                        'circle-stroke-width': 3,
+                        'circle-stroke-color': '#ffffff',
+                        'circle-opacity': 0
+                    },
+                    filter: ['==', ['get', 'name'], '']
+                });
+
+                // Add click event for popups
+                map.on('click', 'hospital-points', (e) => {
+                    const coordinates = e.features[0].geometry.coordinates.slice();
+                    const properties = e.features[0].properties;
+
+                    // Close previous popup if it exists
+                    if (currentPopup) {
+                        currentPopup.remove();
+                        currentPopup = null;
+                    }
+
+                    // Ensure that if the map is zoomed out such that multiple
+                    // copies of the feature are visible, the popup appears
+                    // over the copy being pointed to.
+                    while (Math.abs(e.lngLat.lng - coordinates[0]) > 180) {
+                        coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
+                    }
+
+                    // Create new popup and store reference
+                    currentPopup = new mapboxgl.Popup({
+                        offset: 10,
+                        closeButton: true,
+                        closeOnClick: false,
+                        maxWidth: '350px'
+                    })
+                        .setLngLat(coordinates)
+                        .setHTML(createPopupContent(properties))
+                        .addTo(map);
+
+                    // Clear reference when popup is closed manually
+                    currentPopup.on('close', () => {
+                        currentPopup = null;
+                    });
+                });
+
+                // Add hover effects
+                map.on('mouseenter', 'hospital-points', (e) => {
+                    map.getCanvas().style.cursor = 'pointer';
+
+                    if (e.features.length > 0) {
+                        map.setFilter('hospital-points-hover', ['==', ['get', 'name'], e.features[0].properties.name]);
+                        map.setPaintProperty('hospital-points-hover', 'circle-opacity', 1);
+                    }
+                });
+
+                map.on('mouseleave', 'hospital-points', () => {
+                    map.getCanvas().style.cursor = '';
+                    map.setPaintProperty('hospital-points-hover', 'circle-opacity', 0);
+                    map.setFilter('hospital-points-hover', ['==', ['get', 'name'], '']);
+                });
+
+                // Fit map to show all points
+                if (geojsonData.features.length > 0) {
+                    const bounds = new mapboxgl.LngLatBounds();
+                    geojsonData.features.forEach(feature => {
+                        bounds.extend(feature.geometry.coordinates);
+                    });
+                    map.fitBounds(bounds, { padding: 50 });
+                }
+
+                document.getElementById('loading').style.display = 'none';
+
+            } catch (error) {
+                console.error('Error loading data:', error);
+                document.getElementById('loading').innerHTML = 'Error loading data';
+            }
+        }
+
+        // Apply custom map styling (water white, land #d2e3e8)
+        function applyCustomStyle() {
+            const waterColor = '#ffffff';
+            const landColor = '#d2e3e8';
+
+            if (!map || !map.isStyleLoaded()) return;
+
+            const layers = map.getStyle().layers || [];
+
+            layers.forEach(layer => {
+                const id = (layer.id || '').toLowerCase();
+                try {
+                    // Water-related layers
+                    if (id.includes('water') || id.includes('ocean') || id.includes('sea') || id.includes('river') || id.includes('waterway')) {
+                        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', waterColor);
+                        else if (layer.type === 'line') map.setPaintProperty(layer.id, 'line-color', waterColor);
+                        else if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', waterColor);
+                    }
+
+                    // Background or land-like layers
+                    else if (layer.type === 'background' || id.includes('land') || id.includes('landuse') || id.includes('park') || id.includes('grass')) {
+                        if (layer.type === 'fill') map.setPaintProperty(layer.id, 'fill-color', landColor);
+                        else if (layer.type === 'background') map.setPaintProperty(layer.id, 'background-color', landColor);
+                    }
+
+                    // Hide county-level boundaries (admin-2)
+                    if (id.includes('admin-2') || (id.includes('admin') && id.includes('2'))) {
+                        try { map.setLayoutProperty(layer.id, 'visibility', 'none'); } catch (e) { }
+                        if (layer.type === 'line') {
+                            try { map.setPaintProperty(layer.id, 'line-opacity', 0); } catch (e) { }
+                        }
+                        if (layer.type === 'fill') {
+                            try { map.setPaintProperty(layer.id, 'fill-opacity', 0); } catch (e) { }
+                        }
+                    }
+
+                    // Hide region/state-level boundaries (admin-1)
+                    if (id.includes('admin-1') || (id.includes('admin') && id.includes('1')) || id.includes('region') || id.includes('state') || id.includes('province')) {
+                        try { map.setLayoutProperty(layer.id, 'visibility', 'none'); } catch (e) { }
+                        if (layer.type === 'line') {
+                            try { map.setPaintProperty(layer.id, 'line-opacity', 0); } catch (e) { }
+                            try { map.setPaintProperty(layer.id, 'line-width', 0); } catch (e) { }
+                        }
+                        if (layer.type === 'fill') {
+                            try { map.setPaintProperty(layer.id, 'fill-opacity', 0); } catch (e) { }
+                        }
+                    }
+
+                    // Make country borders (admin-0) white
+                    if (id.includes('admin-0') || (id.includes('admin') && id.includes('0')) || id.includes('country') || id.includes('admin-0-boundary') || id.includes('admin-0-boundaries')) {
+                        if (layer.type === 'line') {
+                            try { map.setPaintProperty(layer.id, 'line-color', '#ffffff'); } catch (e) { }
+                            try { map.setPaintProperty(layer.id, 'line-opacity', 1); } catch (e) { }
+                            try {
+                                // Use a small constant width or a zoom-based interpolate for subtle borders
+                                map.setPaintProperty(layer.id, 'line-width', [
+                                    'interpolate', ['linear'], ['zoom'],
+                                    0, 0.4,
+                                    5, 0.6,
+                                    10, 1
+                                ]);
+                            } catch (e) { }
+                        }
+                        if (layer.type === 'fill') {
+                            try { map.setPaintProperty(layer.id, 'fill-color', '#ffffff'); } catch (e) { }
+                            try { map.setPaintProperty(layer.id, 'fill-opacity', 0.0); } catch (e) { }
+                        }
+                    }
+                    // Hide country name labels (symbols)
+                    if ((id.includes('country') && (id.includes('label') || id.includes('name') || id.includes('place'))) || id.includes('place_country') || id.includes('country-label')) {
+                        try { map.setLayoutProperty(layer.id, 'visibility', 'none'); } catch (e) { }
+                        if (layer.type === 'symbol') {
+                            try { map.setPaintProperty(layer.id, 'text-opacity', 0); } catch (e) { }
+                            try { map.setPaintProperty(layer.id, 'icon-opacity', 0); } catch (e) { }
+                        }
+                    }
+
+                    // Hide all text/symbol labels on the map
+                    if (layer.type === 'symbol') {
+                        try { map.setLayoutProperty(layer.id, 'visibility', 'none'); } catch (e) { }
+                        try { map.setPaintProperty(layer.id, 'text-opacity', 0); } catch (e) { }
+                        try { map.setPaintProperty(layer.id, 'icon-opacity', 0); } catch (e) { }
+                        try { map.setPaintProperty(layer.id, 'text-halo-opacity', 0); } catch (e) { }
+                        try { map.setPaintProperty(layer.id, 'text-color', 'rgba(0,0,0,0)'); } catch (e) { }
+                    }
+                } catch (e) {
+                    // Ignore failures for layers we can't change
+                }
+            });
+        }
+
+        // Load data when map is loaded and apply custom style
+        map.on('load', () => {
+            applyCustomStyle();
+            loadHospitalData();
+        });
+
+        // Add navigation controls
+        map.addControl(new mapboxgl.NavigationControl());
+
+        // Add fullscreen control
+        map.addControl(new mapboxgl.FullscreenControl());
+    </script>
+</body>
+
+</html>

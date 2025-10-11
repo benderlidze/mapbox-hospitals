@@ -28,8 +28,8 @@
             border-radius: 12px;
             box-shadow: 0 8px 32px rgba(0, 0, 0, 0.12);
             border: 1px solid rgba(0, 0, 0, 0.06);
-            background: #ffffff;
-            padding: 30px;
+            background: rgba(255, 255, 255, 0.90);
+            padding: 15px;
             color: #23303a;
             font-family: "Albert Sans", "Albert Sans Placeholder", sans-serif !important;
         }
@@ -219,7 +219,7 @@
             const goKarts = properties.goKarts || '—';
             const kids = properties.kidsSupported || '—';
             return `
-                <div style="border:0px solid red">
+                <div>
                     <div class="popup-header">${properties.name}</div>
                     <div class="popup-address">${properties.address || ''}</div>
 
@@ -228,7 +228,7 @@
                     <div class="popup-flex">
                         <div class="popup-flex-item">
                             <div class="label">GO Karts</div>
-                            <div class="value" style="min-width:26px;text-align:center">${goKarts}</div>
+                            <div class="value" style="min-width:26px;text-align:center;color:#f9af7c">${goKarts}</div>
                         </div>
                         <div class="popup-flex-item">
                             <div class="label">Player 2 Active</div>
@@ -319,7 +319,6 @@
                     filter: ['==', ['get', 'name'], '']
                 });
 
-                // Add click event for popups
                 map.on('click', 'hospital-points', (e) => {
                     const coordinates = e.features[0].geometry.coordinates.slice();
                     const properties = e.features[0].properties;
@@ -337,6 +336,9 @@
                         coordinates[0] += e.lngLat.lng > coordinates[0] ? 360 : -360;
                     }
 
+                    // Center map at feature coordinates (for mobile popups)
+                    map.easeTo({ center: coordinates });
+
                     // Create new popup and store reference
                     currentPopup = new mapboxgl.Popup({
                         offset: 10,
@@ -353,6 +355,7 @@
                         currentPopup = null;
                     });
                 });
+
 
                 // Add hover effects
                 map.on('mouseenter', 'hospital-points', (e) => {
@@ -485,10 +488,11 @@
         });
 
         // Add navigation controls
-        map.addControl(new mapboxgl.NavigationControl());
-
-        // Add fullscreen control
-        map.addControl(new mapboxgl.FullscreenControl());
+        const navigation = new mapboxgl.NavigationControl({
+            showCompass: false,
+            showZoom: true
+        });
+        map.addControl(navigation, 'bottom-left');
     </script>
 </body>
 

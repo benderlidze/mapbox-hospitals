@@ -213,7 +213,6 @@
             };
         }
 
-        // Function to create popup content with 2x2 grid and vertical padding
         function createPopupContent(properties) {
             console.log('properties', properties);
             const goKarts = properties.goKarts || '—';
@@ -344,7 +343,7 @@
                         offset: 10,
                         closeButton: true,
                         closeOnClick: false,
-                        maxWidth: '350px'
+                        maxWidth: '265px'
                     })
                         .setLngLat(coordinates)
                         .setHTML(createPopupContent(properties))

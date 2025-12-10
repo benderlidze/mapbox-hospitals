@@ -131,12 +131,12 @@
 
         function createGeoJSON(hospitals) {
             console.log('Total hospitals in CSV:', hospitals.length);
-            
+
             const features = hospitals
                 .filter(hospital => {
-                    const hasCoords = hospital.lat && hospital.lon && 
-                                    !isNaN(parseFloat(hospital.lat)) && 
-                                    !isNaN(parseFloat(hospital.lon));
+                    const hasCoords = hospital.lat && hospital.lon &&
+                        !isNaN(parseFloat(hospital.lat)) &&
+                        !isNaN(parseFloat(hospital.lon));
                     if (!hasCoords) {
                         console.warn('Skipping hospital without valid coordinates:', hospital.Hospitals || 'Unknown');
                     }
@@ -149,6 +149,8 @@
                         address: hospital.Address || '',
                         goKarts: hospital['Go Karts'] || '0',
                         kidsSupported: hospital['Kids Supported'] || '0',
+                        playerTwoActive: hospital['Player 2'] || '',
+                        savePoint: hospital['Save Point'] || '',
                     },
                     geometry: {
                         type: 'Point',
@@ -157,7 +159,7 @@
                 }));
 
             console.log('Valid hospitals with coordinates:', features.length);
-            
+
             return {
                 type: 'FeatureCollection',
                 features: features
@@ -166,6 +168,43 @@
 
         function createPopupContent(properties) {
             const goKarts = properties.goKarts || '—';
+
+            // Check if Player 2 Active is "yes" (case insensitive)
+            const isPlayerTwoActive = (properties.playerTwoActive || '').toLowerCase().trim() === 'yes';
+            // Check if Save Point is "yes" (case insensitive)
+            const isSavePoint = (properties.savePoint || '').toLowerCase().trim() === 'yes';
+
+            // SVG for checkmark (yes)
+            const checkmarkSVG = `
+                  <svg display="block" role="presentation" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="26" height="26">
+                                <path d="M 5 10 L 8.5 13.5 L 15 7 M 20 10 C 20 15.523 15.523 20 10 20 C 4.477 20 0 15.523 0 10 C 0 4.477 4.477 0 10 0 C 15.523 0 20 4.477 20 10 Z" 
+                                        fill="none" 
+                                        stroke="#f9af7c" 
+                                        stroke-width="2" 
+                                        stroke-linecap="round" 
+                                        stroke-linejoin="round" 
+                                        transform="translate(2 2)"/>
+                                </svg>
+            `;
+
+            // SVG for X (no/empty)
+            const xMarkSVG = `
+                <svg display="block" role="presentation" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="26" height="26">
+                    <path d="M 14 6 L 10 10 M 10 10 L 6 14 M 10 10 L 6 6 M 10 10 L 14 14 M 20 10 C 20 15.523 15.523 20 10 20 C 4.477 20 0 15.523 0 10 C 0 4.477 4.477 0 10 0 C 15.523 0 20 4.477 20 10 Z" 
+                            fill="none" 
+                            stroke="#f9af7c" 
+                            stroke-width="2" 
+                            stroke-linecap="round" 
+                            stroke-linejoin="round" 
+                            transform="translate(2 2)"/>
+                </svg>
+            `;
+
+            console.log('---', properties.name, '---');
+            console.log('isPlayerTwoActive', isPlayerTwoActive);
+            console.log('isSavePoint', isSavePoint);
+
+
             return `
                 <div>
                     <div class="popup-header">${properties.name}</div>
@@ -181,29 +220,13 @@
                         <div class="popup-flex-item">
                             <div class="label">Player 2 Active</div>
                             <div class="value">
-                              <svg display="block" role="presentation" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="26" height="26">
-                                <path d="M 5 10 L 8.5 13.5 L 15 7 M 20 10 C 20 15.523 15.523 20 10 20 C 4.477 20 0 15.523 0 10 C 0 4.477 4.477 0 10 0 C 15.523 0 20 4.477 20 10 Z" 
-                                        fill="none" 
-                                        stroke="#f9af7c" 
-                                        stroke-width="2" 
-                                        stroke-linecap="round" 
-                                        stroke-linejoin="round" 
-                                        transform="translate(2 2)"/>
-                                </svg>
+                                ${isPlayerTwoActive ? checkmarkSVG : xMarkSVG}
                             </div>
                         </div>
                         <div class="popup-flex-item">
                             <div class="label">Save Point</div>
                             <div class="value">
-                                <svg display="block" role="presentation" viewBox="0 0 24 24" xmlns="http://www.w3.org/2000/svg" width="26" height="26">
-                                    <path d="M 14 6 L 10 10 M 10 10 L 6 14 M 10 10 L 6 6 M 10 10 L 14 14 M 20 10 C 20 15.523 15.523 20 10 20 C 4.477 20 0 15.523 0 10 C 0 4.477 4.477 0 10 0 C 15.523 0 20 4.477 20 10 Z" 
-                                            fill="none" 
-                                            stroke="#f9af7c" 
-                                            stroke-width="2" 
-                                            stroke-linecap="round" 
-                                            stroke-linejoin="round" 
-                                            transform="translate(2 2)"/>
-                                </svg>
+                                ${isSavePoint ? checkmarkSVG : xMarkSVG}
                             </div>
                         </div>
                     </div>
@@ -233,7 +256,7 @@
         async function loadHospitalData() {
             try {
                 document.getElementById('loading').innerHTML = 'Fetching hospital data...';
-                
+
                 const response = await fetchWithRetry(getCsvUrl());
 
                 if (!response || response.length === 0) {
@@ -312,7 +335,7 @@
                 // Click handler
                 map.on('click', 'hospital-points', (e) => {
                     if (!e.features || e.features.length === 0) return;
-                    
+
                     const coordinates = e.features[0].geometry.coordinates.slice();
                     const properties = e.features[0].properties;
 
@@ -429,7 +452,7 @@
                     // Ignore
                 }
             });
-            
+
             console.log('✅ Custom styling applied');
         }
 
